@@ -43,10 +43,11 @@ const table = (heads, data, message = "No entries in this period.", numeric = []
   : empty(message);
 const metrics = data => `<div class="metrics">${data.map(([label,value,detail,tone]) => `<div class="metric">
   <small>${label}</small><strong class="${tone || ""}">${value}</strong>${detail ? `<small>${detail}</small>` : ""}</div>`).join("")}</div>`;
-const field = (label, name, value = "", options = "") => `<label>${label}<input name="${name}" value="${esc(value)}" ${options}></label>`;
+const field = (label, name, value = "", options = "") =>
+  `<label>${label}<input aria-label="${esc(label)}" name="${name}" value="${esc(value)}" ${options}></label>`;
 const number = (label,name,value = "",step = "1",min = "0") =>
   field(label,name,value,`type="number" step="${step}" min="${min}" required`);
-const select = (label,name,options,value = "",extra = "") => `<label>${label}<select name="${name}" required ${extra}>
+const select = (label,name,options,value = "",extra = "") => `<label>${label}<select aria-label="${esc(label)}" name="${name}" required ${extra}>
   ${options.map(([key,title]) => `<option value="${esc(key)}" ${String(key) === String(value) ? "selected" : ""}>${esc(title)}</option>`).join("")}</select></label>`;
 const itemOptions = items => [["","Choose an item"], ...items.map(i => [i.id,i.name])];
 const unitOptions = item => ({kg:[["kg","kg"],["g","g"]],L:[["L","L"],["ml","ml"]],piece:[["piece","piece"]],
@@ -80,7 +81,7 @@ export function loginView() {
         ${field("Username","login","","required autocomplete=username")}${field("Password","password","","type=password required autocomplete=current-password")}
         </div>`,submit("Sign in"))}`)}
       ${panel("Benchmark accounts",`<p class="muted">Select an account to fill its test credentials.</p>
-        <div class="quick">${accounts.map(([login,name,role]) => `<button type="button" data-action="demo-login" data-value="${login}">
+        <div class="quick">${accounts.map(([login,name,role]) => `<button type="button" aria-label="${name}" data-action="demo-login" data-value="${login}">
           <span>${name}</span><small>${role}</small></button>`).join("")}</div>`)}
     </div></main>`;
 }
@@ -174,7 +175,8 @@ function orderDesk(state, ui) {
       ${order.status === "Submitted" ? "" : table(["Product","Packets","Price per pack"],order.lines.map(l => [esc(l.name),l.quantity,money(l.price)]),"",[1,2])}
       ${edit}`);
   }
-  return pageStart("Order desk","Verify incoming orders, reserve stock and raise GST invoices.") + detail +
+  return pageStart("Order desk","Verify incoming orders, reserve stock and raise GST invoices.",
+    button("Refresh orders","refresh-orders")) + detail +
     panel("",`<div class="panel-head"><h2>Incoming orders</h2><small>${visible.length} orders</small></div>
       <div class="section-links" aria-label="Filter orders">${filters.map(k => `<button data-action="order-filter" data-value="${k}"
         aria-pressed="${ui.orderFilter === k}">${k}</button>`).join("")}</div><br>
@@ -309,7 +311,7 @@ function inventory(state, ui) {
 
 export const reportUrl = (key, from, to, format = "") => `/api/reports/${key}?${new URLSearchParams({from,to,...(format ? {format} : {})})}`;
 function reportTable(data) {
-  return table(data.headings,data.rows.map(row => row.map(v => v === "Review" ? pill(v,"warn") : esc(v)),
+  return table(data.headings,data.rows.map(row => row.map(v => v === "Review" ? pill(v,"warn") : esc(v))),
     "No entries in this period.",data.headings.map((h,i) => /amount|rate|total|closing|opening|received|tax|cgst|sgst|igst|margin|cost|variance|current|days|outstanding|packets|planned|actual|scrap|issues|receipts|balance/i.test(h) && h !== "Date" ? i : -1),"report-table");
 }
 

@@ -128,13 +128,24 @@ async function sync() {
 
 async function route() {
   if (!state) { print(); return; }
+  const login = state.user.login;
+  if (!ui.offline) {
+    try {
+      const updated = await api("/api/state");
+      if (state?.user.login !== login) return;
+      state = updated;
+      saveSalesSnapshot();
+    } catch {
+      if (state?.user.login !== login) return;
+    }
+  }
   const choices = pages(state.user.role);
   const requested = location.hash.slice(1);
   page = Object.hasOwn(choices,requested) ? requested : Object.keys(choices)[0];
   print();
   window.scrollTo(0,0);
   if (page === "inventory" && state.user.role !== "owner") await ledger();
-  if (page === "reports" && !ui.reportData) {
+  if (page === "reports") {
     try { await loadReport(); } catch (error) { toast(error.message); }
   }
 }
@@ -296,6 +307,11 @@ app.addEventListener("click", async event => {
       saveQueue(ui.queue.filter(entry => entry.token !== value)); print();
     } else if (action === "open-order") {
       ui.selectedOrder = id; go("orders");
+    } else if (action === "refresh-orders") {
+      await refresh();
+      ui.selectedOrder = 0;
+      print();
+      toast("Order desk refreshed.");
     } else if (action === "order-filter") {
       ui.orderFilter = value; ui.selectedOrder = 0; print();
     } else if (action === "open-invoice") {

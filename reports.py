@@ -5,8 +5,9 @@ from io import BytesIO, StringIO
 from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_RIGHT
 from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from domain import FACTORY, Problem, rows, run_data
@@ -180,9 +181,10 @@ def pdf(title, subtitle, heads, data, sections=(), wide=True, footer="Amounts in
     styles = getSampleStyleSheet()
     styles["Normal"].fontSize = 9
     styles["Normal"].leading = 13
-    styles["Code"].fontName = "Helvetica"
-    styles["Code"].fontSize = 7
-    styles["Code"].leading = 10
+    styles.add(ParagraphStyle("Cell", fontName="Helvetica", fontSize=8, leading=11))
+    styles.add(ParagraphStyle("CellNumber", parent=styles["Cell"], alignment=TA_RIGHT))
+    styles.add(ParagraphStyle("ColumnHeading", parent=styles["Cell"], fontName="Helvetica-Bold"))
+    styles.add(ParagraphStyle("NumericHeading", parent=styles["ColumnHeading"], alignment=TA_RIGHT))
 
     def p(value, style="Normal"):
         return Paragraph(escape(str(value)).replace("\n", "<br/>"), styles[style])
@@ -192,10 +194,15 @@ def pdf(title, subtitle, heads, data, sections=(), wide=True, footer="Amounts in
         flow += [p(heading, "Heading3"), p(detail)]
     if sections:
         flow.append(Spacer(1, 12))
-    values = [[p(c, "Code") for c in heads]]
-    values += [[p(c, "Code") for c in row] for row in data]
+    numeric = set()
+    for column in range(len(heads)):
+        present = [str(row[column]) for row in data if row[column] not in ("", "—")]
+        if present and all(c.lstrip("+-").rstrip("%").replace(".", "", 1).isdigit() for c in present):
+            numeric.add(column)
+    values = [[p(c, "NumericHeading" if i in numeric else "ColumnHeading") for i, c in enumerate(heads)]]
+    values += [[p(c, "CellNumber" if i in numeric else "Cell") for i, c in enumerate(row)] for row in data]
     if len(values) == 1:
-        values.append([p("No entries in this period.", "Code")] + [""] * (len(heads) - 1))
+        values.append([p("No entries in this period.", "Cell")] + [""] * (len(heads) - 1))
     available = doc.width
     weights = [max(7, min(30, max(len(str(head)), *(len(str(row[i])) for row in data[:100]), 7)))
                for i, head in enumerate(heads)]
@@ -209,6 +216,8 @@ def pdf(title, subtitle, heads, data, sections=(), wide=True, footer="Amounts in
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
+    if not data:
+        table.setStyle(TableStyle([("SPAN", (0, 1), (-1, 1))]))
     flow += [table, Spacer(1, 12), p(footer)]
 
     def page(canvas, document):
