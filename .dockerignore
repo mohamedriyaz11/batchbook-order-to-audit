@@ -1,0 +1,8 @@
+.git
+.venv
+.qa
+.taste-skill
+data
+__pycache__
+*.pdf
+demo/

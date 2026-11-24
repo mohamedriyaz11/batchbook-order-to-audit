@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
@@ -45,11 +45,11 @@ def write(db):
 
 def initialize(path):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with connect(path) as db:
+    with closing(connect(path)) as db:
         db.execute("PRAGMA journal_mode=WAL")
         db.executescript((ROOT / "schema.sql").read_text(encoding="utf-8"))
         with write(db):
-            seed(db, today().replace(today()[-2:], "01"))
+            seed(db, today()[:8] + "01")
 
 
 def rows(db, sql, *args):
@@ -415,9 +415,13 @@ def adjust(db, actor, data, day):
     reason = clean(data.get("reason"), "adjustment reason", 240)
     code = f"ADJ-{one(db, 'SELECT COALESCE(MAX(id),0)+1 n FROM movements')['n']:04}"
     if data.get("direction") == "Decrease":
+        if item["kind"] == "finished" and qty > availability(db, item["id"], 0):
+            raise Problem("A stock adjustment cannot remove packets already reserved for orders.", 409)
         issue(db, actor, item, day, "Adjustment decrease", code, qty)
     elif data.get("direction") == "Increase":
         rate = money(data.get("rate", 0), "adjustment rate", int(item["kind"] != "finished"))
+        if item["kind"] == "finished":
+            rate = 0
         value = rounded(qty * rate, UNITS[item["unit"]][item["unit"]])
         move(db, actor, item["id"], day, "Adjustment increase", code, qty, value)
     else:
